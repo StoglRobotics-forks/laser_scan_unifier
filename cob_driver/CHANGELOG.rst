@@ -2,6 +2,23 @@
 Changelog for package cob_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+Forthcoming
+-----------
+* Merge pull request `#445 <https://github.com/4am-robotics/cob_driver/issues/445>`_ from fmessmer/noetic-devel
+  cob4 eol cleanup
+* remove cob_bms_driver
+* add laser_scan_densifier to cob_driver meta-package
+* remove cob_relayboard
+* remove cob_utilities
+* remove cob_generic_can
+* remove cob_canopen_motor
+* remove cob_base_drive_chain
+* remove cob_undercarriage_ctrl
+* remove cob_elmo_homing
+* remove cob_voltage_control
+* remove cob_sick_lms1xx
+* Contributors: Felix Messmer, fmessmer
+
 0.7.16 (2024-02-20)
 -------------------
 
