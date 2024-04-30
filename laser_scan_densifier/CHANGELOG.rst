@@ -5,6 +5,12 @@ Changelog for package laser_scan_densifier
 0.7.17 (2024-04-18)
 -------------------
 
+Forthcoming
+-----------
+* 0.7.17
+* update changelogs
+* Contributors: fmessmer
+
 0.7.16 (2024-02-20)
 -------------------
 
