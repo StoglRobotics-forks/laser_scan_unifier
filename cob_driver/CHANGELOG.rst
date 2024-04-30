@@ -19,8 +19,8 @@ Changelog for package cob_driver
 * remove cob_sick_lms1xx
 * Contributors: Felix Messmer, fmessmer
 
-Forthcoming
------------
+0.8.17 (2024-04-30)
+-------------------
 * 0.7.17
 * update changelogs
 * Merge pull request `#445 <https://github.com/4am-robotics/cob_driver/issues/445>`_ from fmessmer/noetic-devel
