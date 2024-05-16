@@ -15,37 +15,38 @@
  */
 
 
-#ifndef SCAN_UNIFIER_NODE_H
-#define SCAN_UNIFIER_NODE_H
+#ifndef LASER_SCAN_UNIFIER__SCAN_UNIFIER_NODE_HPP_
+#define LASER_SCAN_UNIFIER__SCAN_UNIFIER_NODE_HPP_
 
 //##################
 //#### includes ####
 
 // standard includes
-#include <pthread.h>
-#include <XmlRpc.h>
+#include <thread>
+//#include <XmlRpc.h>
 #include <math.h>
 
 // ROS includes
-#include <ros/ros.h>
-#include <tf/transform_listener.h>
-#include <tf/tf.h>
-#include <tf/transform_datatypes.h>
-#include <sensor_msgs/PointCloud.h>
-#include <laser_geometry/laser_geometry.h>
-#include <message_filters/subscriber.h>
-#include <message_filters/synchronizer.h>
-#include <message_filters/sync_policies/approximate_time.h>
+#include "rclcpp/rclcpp.hpp"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "laser_geometry/laser_geometry.hpp"
+#include "message_filters/subscriber.h"
+#include "message_filters/synchronizer.h"
+#include "message_filters/sync_policies/approximate_time.h"
 
 // ROS message includes
-#include <sensor_msgs/LaserScan.h>
-#include <sensor_msgs/PointCloud2.h>
+#include "sensor_msgs/msg/point_cloud.hpp"
+#include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/msg/laser_scan.hpp"
+
 
 //####################
 //#### node class ####
-class ScanUnifierNode
-{
-  private:
+//class ScanUnifierNode
+//{
+  //private:
     /** @struct config_struct
      *  @brief This structure holds configuration parameters
      *  @var config_struct::number_input_scans
@@ -54,7 +55,7 @@ class ScanUnifierNode
      *  Member 'loop_rate' contains the loop rate of the ros node
      *  @var config_struct::input_scan_topics
      *  Member 'input_scan_topics' contains the names of the input scan topics
-     */
+
     struct config_struct{
       int number_input_scans;
       std::vector<std::string> input_scan_topics;
@@ -95,10 +96,12 @@ class ScanUnifierNode
     // destructor
     ~ScanUnifierNode();
 
+    */
     /* ----------------------------------- */
     /* --------- ROS Variables ----------- */
     /* ----------------------------------- */
 
+    /*
     // create node handles
     ros::NodeHandle nh_, pnh_;
 
@@ -113,6 +116,7 @@ class ScanUnifierNode
     laser_geometry::LaserProjection projector_;
 
     std::vector<sensor_msgs::PointCloud> vec_cloud_;
+    */
 
     /* ----------------------------------- */
     /* ----------- functions ------------- */
@@ -124,9 +128,9 @@ class ScanUnifierNode
      *
      * input: -
      * output: -
-     */
+     
     void getParams();
-
+    */
     /**
      * @function unifieLaserScans
      * @brief unifie the scan information from all laser scans in vec_laser_struct_
@@ -134,9 +138,10 @@ class ScanUnifierNode
      * input: -
      * output:
      * @param: a laser scan message containing unified information from all scanners
-     */
+     
     void publish(sensor_msgs::LaserScan& unified_scan);
     bool unifyLaserScans(const std::vector<sensor_msgs::LaserScan::ConstPtr>& current_scans,
                          sensor_msgs::LaserScan& unified_scan);
 };
-#endif
+*/
+#endif // LASER_SCAN_UNIFIER__SCAN_UNIFIER_NODE_HPP_

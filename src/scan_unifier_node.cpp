@@ -15,8 +15,8 @@
  */
 
 
-#include <cob_scan_unifier/scan_unifier_node.h>
-
+#include "laser_scan_unifier/scan_unifier_node.hpp"
+/*
 // Constructor
 ScanUnifierNode::ScanUnifierNode()
 {
@@ -108,13 +108,15 @@ ScanUnifierNode::~ScanUnifierNode()
     delete(synchronizer4_);
 }
 
+*/
+
 /**
  * @function getParams
  * @brief function to load parameters from ros parameter server
  *
  * input: -
  * output: -
- */
+ 
 void ScanUnifierNode::getParams()
 {
   std::vector<std::string> topicList;
@@ -210,6 +212,8 @@ void ScanUnifierNode::publish(sensor_msgs::LaserScan& unified_scan)
   }
 }
 
+*/
+
 /**
  * @function unifyLaserScans
  * @brief unifie the scan information from all laser scans in vec_laser_struct_
@@ -217,7 +221,7 @@ void ScanUnifierNode::publish(sensor_msgs::LaserScan& unified_scan)
  * input: -
  * output:
  * @param: a laser scan message containing unified information from all scanners
- */
+
 bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::LaserScan::ConstPtr>& current_scans,
                                       sensor_msgs::LaserScan& unified_scan)
 {
@@ -306,15 +310,9 @@ bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::LaserScan::
 
   return true;
 }
-
+ */
 int main(int argc, char** argv)
 {
-  ROS_DEBUG("scan unifier: start scan unifier node");
-  ros::init(argc, argv, "cob_scan_unifier_node");
-
-  ScanUnifierNode scan_unifier_node;
-
-  ros::spin();
 
   return 0;
 }
