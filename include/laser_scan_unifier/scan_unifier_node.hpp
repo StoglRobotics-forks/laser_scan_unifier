@@ -28,25 +28,30 @@
 
 // ROS includes
 #include "rclcpp/rclcpp.hpp"
+#include "tf2/exceptions.h"
 #include "tf2_ros/transform_listener.h"
 #include "tf2_ros/buffer.h"
+#include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "laser_geometry/laser_geometry.hpp"
 #include "message_filters/subscriber.h"
-#include "message_filters/synchronizer.h"
+#include "message_filters/time_synchronizer.h"
 #include "message_filters/sync_policies/approximate_time.h"
 
 // ROS message includes
-#include "sensor_msgs/msg/point_cloud.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
+#include "sensor_msgs/point_cloud2_iterator.hpp"
 #include "sensor_msgs/msg/laser_scan.hpp"
 
 
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::LaserScan, sensor_msgs::msg::LaserScan> Sync2Policy;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::LaserScan, sensor_msgs::msg::LaserScan, sensor_msgs::msg::LaserScan> Sync3Policy;
+typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::LaserScan, sensor_msgs::msg::LaserScan, sensor_msgs::msg::LaserScan, sensor_msgs::msg::LaserScan> Sync4Policy;
 //####################
 //#### node class ####
-//class ScanUnifierNode
-//{
-  //private:
+class ScanUnifierNode : public rclcpp::Node
+{
+  private:
     /** @struct config_struct
      *  @brief This structure holds configuration parameters
      *  @var config_struct::number_input_scans
@@ -55,68 +60,57 @@
      *  Member 'loop_rate' contains the loop rate of the ros node
      *  @var config_struct::input_scan_topics
      *  Member 'input_scan_topics' contains the names of the input scan topics
-
+     */
     struct config_struct{
-      int number_input_scans;
+      size_t number_input_scans;
       std::vector<std::string> input_scan_topics;
-      bool publish_pointcloud;
+      bool publish_pointcloud = false;
     };
-
     config_struct config_;
-
     std::string frame_;
 
-    std::vector<message_filters::Subscriber<sensor_msgs::LaserScan>* > message_filter_subscribers_;
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>> message_filter_subscribers_;
 
-    message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan,
-                                                                                  sensor_msgs::LaserScan> >* synchronizer2_;
-    message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan,
-                                                                                  sensor_msgs::LaserScan,
-                                                                                  sensor_msgs::LaserScan> >* synchronizer3_;
-    message_filters::Synchronizer<message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan,
-                                                                                  sensor_msgs::LaserScan,
-                                                                                  sensor_msgs::LaserScan,
-                                                                                  sensor_msgs::LaserScan> >* synchronizer4_;
 
-    void messageFilterCallback(const sensor_msgs::LaserScan::ConstPtr& first_scanner,
-                               const sensor_msgs::LaserScan::ConstPtr& second_scanner);
-    void messageFilterCallback(const sensor_msgs::LaserScan::ConstPtr& first_scanner,
-                               const sensor_msgs::LaserScan::ConstPtr& second_scanner,
-                               const sensor_msgs::LaserScan::ConstPtr& third_scanner);
-    void messageFilterCallback(const sensor_msgs::LaserScan::ConstPtr& first_scanner,
-                               const sensor_msgs::LaserScan::ConstPtr& second_scanner,
-                               const sensor_msgs::LaserScan::ConstPtr& third_scanner,
-                               const sensor_msgs::LaserScan::ConstPtr& fourth_scanner);
+
+    void sync2FilterCallback(const sensor_msgs::msg::LaserScan::SharedPtr& first_scanner,
+                               const sensor_msgs::msg::LaserScan::SharedPtr& second_scanner);
+    void sync3FilterCallback(const sensor_msgs::msg::LaserScan::SharedPtr& first_scanner,
+                               const sensor_msgs::msg::LaserScan::SharedPtr& second_scanner,
+                               const sensor_msgs::msg::LaserScan::SharedPtr& third_scanner);
+    void sync4FilterCallback(const sensor_msgs::msg::LaserScan::SharedPtr& first_scanner,
+                               const sensor_msgs::msg::LaserScan::SharedPtr& second_scanner,
+                               const sensor_msgs::msg::LaserScan::SharedPtr& third_scanner,
+                               const sensor_msgs::msg::LaserScan::SharedPtr& fourth_scanner);
+
+
+
+    std::shared_ptr<message_filters::Synchronizer<Sync2Policy>> synchronizer2_;    
+    std::shared_ptr<message_filters::Synchronizer<Sync3Policy>> synchronizer3_;
+    std::shared_ptr<message_filters::Synchronizer<Sync4Policy>> synchronizer4_;
+
 
   public:
-
-    // constructor
+    //constructor
     ScanUnifierNode();
-
-    // destructor
-    ~ScanUnifierNode();
-
-    */
     /* ----------------------------------- */
     /* --------- ROS Variables ----------- */
     /* ----------------------------------- */
 
-    /*
-    // create node handles
-    ros::NodeHandle nh_, pnh_;
-
-    // declaration of ros publishers
-    ros::Publisher topicPub_LaserUnified_;
-    ros::Publisher topicPub_PointCloudUnified_;
+    // create publishers
+    rclcpp::Publisher<sensor_msgs::msg::LaserScan>::SharedPtr topicPub_LaserUnified_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr topicPub_PointCloudUnified_;
 
     // tf listener
-    tf::TransformListener listener_;
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
 
     // laser geometry projector
     laser_geometry::LaserProjection projector_;
 
-    std::vector<sensor_msgs::PointCloud> vec_cloud_;
-    */
+
+    std::vector<sensor_msgs::msg::PointCloud2> vec_cloud_;
+    
 
     /* ----------------------------------- */
     /* ----------- functions ------------- */
@@ -128,20 +122,23 @@
      *
      * input: -
      * output: -
+     */
      
     void getParams();
-    */
+    
+    
     /**
-     * @function unifieLaserScans
-     * @brief unifie the scan information from all laser scans in vec_laser_struct_
+     * @function unifyLaserScans
+     * @brief unify the scan information from all laser scans in vec_laser_struct_
      *
      * input: -
      * output:
      * @param: a laser scan message containing unified information from all scanners
-     
-    void publish(sensor_msgs::LaserScan& unified_scan);
-    bool unifyLaserScans(const std::vector<sensor_msgs::LaserScan::ConstPtr>& current_scans,
-                         sensor_msgs::LaserScan& unified_scan);
+     */
+    void publish(sensor_msgs::msg::LaserScan& unified_scan);
+    bool unifyLaserScans(const std::vector<sensor_msgs::msg::LaserScan::SharedPtr>& current_scans,
+                         sensor_msgs::msg::LaserScan& unified_scan);
+                         
 };
-*/
+
 #endif // LASER_SCAN_UNIFIER__SCAN_UNIFIER_NODE_HPP_

@@ -16,303 +16,290 @@
 
 
 #include "laser_scan_unifier/scan_unifier_node.hpp"
-/*
+
+
 // Constructor
-ScanUnifierNode::ScanUnifierNode()
+ScanUnifierNode::ScanUnifierNode() 
+  : Node("scan_unifier_node")
 {
-  ROS_DEBUG("Init scan_unifier");
-
-  // Create node handles
-  nh_ = ros::NodeHandle();
-  pnh_ = ros::NodeHandle("~");
-
-  getParams();
-
-  // Publisher
-  topicPub_LaserUnified_ = nh_.advertise<sensor_msgs::LaserScan>("scan_unified", 1);
-  if(config_.publish_pointcloud)
-  {
-    topicPub_PointCloudUnified_ = nh_.advertise<sensor_msgs::PointCloud2>("pointcloud_unified", 1);
-  }
-
+  auto logger_ = this->get_logger();
+  RCLCPP_DEBUG(logger_, "Init scan_unifier");
+  
   synchronizer2_ = NULL;
   synchronizer3_ = NULL;
   synchronizer4_ = NULL;
 
-  // Subscribe to Laserscan topics
+  //########################## PARAMETERS
+  //getParams();
+  // GET PARAMS SOMEHOW
+  
+  config_.number_input_scans=4;
+  config_.input_scan_topics.push_back("laser_scan_right");
+  config_.input_scan_topics.push_back("laser_scan_front");
+  config_.input_scan_topics.push_back("laser_scan_left");
+  config_.input_scan_topics.push_back("laser_scan_back");
+  frame_ = "base_link";
+  // Minimum possible time between messages on the same topic
+  auto inter_message_lower_bound = rclcpp::Duration::from_seconds(0.167);
 
-  for(int i = 0; i < config_.number_input_scans; i++)
+  //########################## PARAMETERS
+
+
+
+
+  // Publisher
+  topicPub_LaserUnified_ = this->create_publisher<sensor_msgs::msg::LaserScan>("scan_unified", 1);
+  if(config_.publish_pointcloud)
   {
-    message_filter_subscribers_.push_back(
-        new message_filters::Subscriber<sensor_msgs::LaserScan>(nh_, config_.input_scan_topics[i], 1));
+    topicPub_PointCloudUnified_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("pointcloud_unified", 1);
+  }
+
+  // Subscribe to Laserscan topics
+  auto subscriber_options = rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
+  subscriber_options.reliability(rmw_qos_reliability_policy_t::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
+  for(size_t i = 0; i < config_.number_input_scans; i++){
+    // Store the subscriber shared_ptr in a vector if needed for later access
+    auto sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(this, config_.input_scan_topics[i], subscriber_options.get_rmw_qos_profile());
+    message_filter_subscribers_.push_back(sub);
   }
 
 
   // Initialize message_filters::Synchronizer with the right constructor for the choosen number of inputs.
-
   switch (config_.number_input_scans)
   {
     case 2:
-    {
-      typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan, sensor_msgs::LaserScan> SyncPolicy;
-      synchronizer2_ = new message_filters::Synchronizer<SyncPolicy>(
-          SyncPolicy(2), *message_filter_subscribers_.front(), *message_filter_subscribers_[1]);
-      // Set the InterMessageLowerBound to double the period of the laser scans publishing ( 1/{(1/2)*f_laserscans} ).
-      synchronizer2_->setInterMessageLowerBound(0, ros::Duration(0.167));
-      synchronizer2_->setInterMessageLowerBound(1, ros::Duration(0.167));
-      synchronizer2_->registerCallback(boost::bind(&ScanUnifierNode::messageFilterCallback, this, _1, _2));
+    { 
+      synchronizer2_ = std::make_shared<message_filters::Synchronizer<Sync2Policy>>(Sync2Policy(2), 
+        *message_filter_subscribers_[0], 
+        *message_filter_subscribers_[1]);
+      synchronizer2_->setInterMessageLowerBound(0, inter_message_lower_bound);
+      synchronizer2_->setInterMessageLowerBound(1, inter_message_lower_bound);
+      synchronizer2_->registerCallback(&ScanUnifierNode::sync2FilterCallback, this);
       break;
     }
     case 3:
-    {
-      typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan, sensor_msgs::LaserScan, sensor_msgs::LaserScan> SyncPolicy;
-      synchronizer3_ = new message_filters::Synchronizer<SyncPolicy>(
-          SyncPolicy(3), *message_filter_subscribers_.front(), *message_filter_subscribers_[1],
-          *message_filter_subscribers_[2]);
-      synchronizer3_->setInterMessageLowerBound(0, ros::Duration(0.167));
-      synchronizer3_->setInterMessageLowerBound(1, ros::Duration(0.167));
-      synchronizer3_->setInterMessageLowerBound(2, ros::Duration(0.167));
-      synchronizer3_->registerCallback(boost::bind(&ScanUnifierNode::messageFilterCallback, this, _1, _2, _3));
+    { 
+      synchronizer3_ = std::make_shared<message_filters::Synchronizer<Sync3Policy>>(Sync3Policy(3), 
+        *message_filter_subscribers_[0], 
+        *message_filter_subscribers_[1], 
+        *message_filter_subscribers_[2]);
+      synchronizer3_->setInterMessageLowerBound(0, inter_message_lower_bound);
+      synchronizer3_->setInterMessageLowerBound(1, inter_message_lower_bound);
+      synchronizer3_->setInterMessageLowerBound(2, inter_message_lower_bound);
+      synchronizer3_->registerCallback(&ScanUnifierNode::sync3FilterCallback, this);
       break;
     }
     case 4:
-    {
-      typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan, sensor_msgs::LaserScan, sensor_msgs::LaserScan, sensor_msgs::LaserScan> SyncPolicy;
-      synchronizer4_ = new message_filters::Synchronizer<SyncPolicy>(
-          SyncPolicy(4), *message_filter_subscribers_.front(), *message_filter_subscribers_[1],
-          *message_filter_subscribers_[2], *message_filter_subscribers_[3]);
-      synchronizer4_->setInterMessageLowerBound(0, ros::Duration(0.167));
-      synchronizer4_->setInterMessageLowerBound(1, ros::Duration(0.167));
-      synchronizer4_->setInterMessageLowerBound(2, ros::Duration(0.167));
-      synchronizer4_->setInterMessageLowerBound(3, ros::Duration(0.167));
-      synchronizer4_->registerCallback(boost::bind(&ScanUnifierNode::messageFilterCallback, this, _1, _2, _3, _4));
+    { 
+      synchronizer4_ = std::make_shared<message_filters::Synchronizer<Sync4Policy>>(Sync4Policy(10), 
+        *message_filter_subscribers_[0], 
+        *message_filter_subscribers_[1], 
+        *message_filter_subscribers_[2], 
+        *message_filter_subscribers_[3]);
+      synchronizer4_->setInterMessageLowerBound(0, inter_message_lower_bound);
+      synchronizer4_->setInterMessageLowerBound(1, inter_message_lower_bound);
+      synchronizer4_->setInterMessageLowerBound(2, inter_message_lower_bound);
+      synchronizer4_->setInterMessageLowerBound(3, inter_message_lower_bound);
+      synchronizer4_->registerCallback(&ScanUnifierNode::sync4FilterCallback, this);
       break;
     }
     default:
-      ROS_ERROR_STREAM(config_.number_input_scans << " topics have been set as input, but scan_unifier doesn't support this.");
+      RCLCPP_ERROR_STREAM(logger_, config_.number_input_scans << " topics have been set as input, but scan_unifier supports between 2 and 4 topics.");
       return;
   }
 
-  ros::Duration(1.0).sleep();
+  rclcpp::sleep_for(std::chrono::seconds(1));
 }
 
-// Destructor
-
-ScanUnifierNode::~ScanUnifierNode()
-{
-  if(synchronizer2_ != NULL)
-    delete(synchronizer2_);
-  if(synchronizer3_ != NULL)
-    delete(synchronizer3_);
-  if(synchronizer4_ != NULL)
-    delete(synchronizer4_);
-}
-
-*/
 
 /**
- * @function getParams
- * @brief function to load parameters from ros parameter server
+ * @function unifyLaserScans
+ * @brief unify the scan information from all laser scans in vec_laser_struct_
  *
  * input: -
- * output: -
- 
-void ScanUnifierNode::getParams()
+ * output:
+ * @param: a laser scan message containing unified information from all scanners
+ */
+bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::msg::LaserScan::SharedPtr>& current_scans,
+                                      sensor_msgs::msg::LaserScan& unified_scan)
 {
-  std::vector<std::string> topicList;
-
-  if(!pnh_.hasParam("publish_pointcloud"))
+  if(current_scans.empty()) 
   {
-    ROS_WARN("No parameter set for publishing point cloud. Using default value [False].");
-    config_.publish_pointcloud = false;
-  }
-  else
-  {
-    pnh_.getParam("publish_pointcloud", config_.publish_pointcloud);
+    RCLCPP_DEBUG(this->get_logger(), "No scans to unify.");
+    return false;
   }
 
-  if (pnh_.getParam("input_scans", topicList))
+  if (vec_cloud_.size() != config_.number_input_scans)
   {
-    config_.input_scan_topics = topicList;
-    config_.number_input_scans = config_.input_scan_topics.size();
+    vec_cloud_.resize(config_.number_input_scans);
   }
-  else
+  auto logger_ = this->get_logger();
+
+  
+  RCLCPP_DEBUG(logger_, "Starting conversion...");
+
+  for(size_t i=0; i < config_.number_input_scans; i++)
   {
-    config_.number_input_scans = 0;
-    ROS_ERROR("No parameter input_scans on parameter server!! Scan unifier can not subscribe to any scan topic!");
+    RCLCPP_DEBUG(logger_, " - project to PointCloud2");
+    projector_.projectLaser(*current_scans[i], vec_cloud_[i]);
+    /* For testing purposes, turn off point cloud publishing 
+    // Transform cloud if necessary
+    if (!frame_.empty() &&vec_cloud_[i].header.frame_id != frame_) {
+      try 
+      {
+        vec_cloud_[i] = tf_buffer_->transform(vec_cloud_[i], frame_, tf2::durationFromSec(0.1)); //make into parameter
+      } 
+      catch (tf2::TransformException & ex) 
+      {
+        RCLCPP_ERROR_STREAM(logger_, " - PointCloud2 transform failure: " << ex.what());
+        return false;
+      }
+    }
+    */
   }
 
-  if(!pnh_.hasParam("frame"))
-  {
-    ROS_WARN("No parameter frame on parameter server. Using default value [base_link].");
+  RCLCPP_DEBUG(logger_, "... Complete! Unifying scans...");
+  RCLCPP_DEBUG(logger_, " - Creating message header");
+  unified_scan.header = current_scans.front()->header;
+  unified_scan.header.frame_id = frame_;
+  unified_scan.angle_increment = std::abs(current_scans.front()->angle_increment);
+  unified_scan.angle_min = static_cast<float>(-M_PI + unified_scan.angle_increment*0.01);
+  unified_scan.angle_max = static_cast<float>(M_PI - unified_scan.angle_increment*0.01);
+  unified_scan.time_increment = current_scans.front()->time_increment;
+  unified_scan.scan_time = current_scans.front()->scan_time;
+  unified_scan.range_min = current_scans.front()->range_min;
+  unified_scan.range_max = current_scans.front()->range_max;
+  //default values (ranges: range_max, intensities: 0) are used to better reflect the driver behavior
+  //there "phantom" data has values > range_max
+  //but those values are removed during projection to pointcloud
+  unified_scan.ranges.resize(round((unified_scan.angle_max - unified_scan.angle_min) / unified_scan.angle_increment) + 1.0, unified_scan.range_max);
+  unified_scan.intensities.resize(round((unified_scan.angle_max - unified_scan.angle_min) / unified_scan.angle_increment+ 1.0), 0.0);
+
+  // now unify all Scans
+  for(size_t j = 0; j < config_.number_input_scans; j++)
+  { 
+    // Iterating over PointCloud2 point xyz values
+    sensor_msgs::PointCloud2Iterator<float> iterX(vec_cloud_[j], "x");
+    sensor_msgs::PointCloud2Iterator<float> iterY(vec_cloud_[j], "y");
+    sensor_msgs::PointCloud2Iterator<float> iterZ(vec_cloud_[j], "z");
+
+    for (; iterX != iterX.end(); ++iterX, ++iterY, ++iterZ)
+    {
+      const float& x = *iterX;
+      const float& y = *iterY;
+      const float& z = *iterZ;
+
+      //RCLCPP_INFO("Point %f %f %f", x, y, z);
+      if ( std::isnan(x) || std::isnan(y) || std::isnan(z) )
+      {
+        RCLCPP_DEBUG(logger_, " - Rejected for nan in point(%f, %f, %f)\n", x, y, z);
+        continue;
+      }
+      double angle = atan2(y, x);// + M_PI/2;
+      if (angle < unified_scan.angle_min || angle > unified_scan.angle_max)
+      {
+        RCLCPP_DEBUG(logger_, " - Rejected for angle %f not in range (%f, %f)\n", angle, unified_scan.angle_min, unified_scan.angle_max);
+        continue;
+      }
+      int index = std::floor(0.5 + (angle - unified_scan.angle_min) / unified_scan.angle_increment);
+      if(index<0 || index>=unified_scan.ranges.size()) continue;
+      double range_sq = y*y+x*x;
+      //printf ("index xyz( %f %f %f) angle %f index %d range %f\n", x, y, z, angle, index, sqrt(range_sq));
+      if ((sqrt(range_sq) <= unified_scan.ranges[index]))
+      {
+        // use the nearest reflection point of all scans for unified scan
+        unified_scan.ranges[index] = sqrt(range_sq);
+        // get respective intensity from point cloud intensity-channel (index 0)
+        // unified_scan.intensities[index] = vec_cloud_[j].channels.front().values[i];   // intensities may not be necessary, and I'm not sure how to access them
+      }
+    }
   }
-  pnh_.param<std::string>("frame", frame_, "base_link");
+    
+  return true;
 }
 
-
-void ScanUnifierNode::messageFilterCallback(const sensor_msgs::LaserScan::ConstPtr& scan1, const sensor_msgs::LaserScan::ConstPtr& scan2)
+void ScanUnifierNode::publish(sensor_msgs::msg::LaserScan& unified_scan)
 {
-  std::vector<sensor_msgs::LaserScan::ConstPtr> current_scans;
+  RCLCPP_DEBUG(this->get_logger(), "Publishing unified scan.");
+  topicPub_LaserUnified_->publish(unified_scan);
+  /* extract pointcloud transform into a separate function
+  if(config_.publish_pointcloud)
+  {
+    auto unified_pointcloud = sensor_msgs::msg::PointCloud2();
+    projector_.transformLaserScanToPointCloud(frame_, unified_scan, unified_pointcloud, tf_buffer_core_);
+    topicPub_PointCloudUnified_->publish(unified_pointcloud);
+  }
+  */
+  return;
+}
+
+void ScanUnifierNode::sync2FilterCallback(const sensor_msgs::msg::LaserScan::SharedPtr& scan1,
+                                          const sensor_msgs::msg::LaserScan::SharedPtr& scan2)
+{
+  std::vector<sensor_msgs::msg::LaserScan::SharedPtr> current_scans;
   current_scans.push_back(scan1);
   current_scans.push_back(scan2);
 
-  sensor_msgs::LaserScan unified_scan = sensor_msgs::LaserScan();
+  auto unified_scan = sensor_msgs::msg::LaserScan();
+
   if (!unifyLaserScans(current_scans, unified_scan))
   {
     return;
   }
   publish(unified_scan);
+  return;
 }
 
-void ScanUnifierNode::messageFilterCallback(const sensor_msgs::LaserScan::ConstPtr& scan1,
-                                            const sensor_msgs::LaserScan::ConstPtr& scan2,
-                                            const sensor_msgs::LaserScan::ConstPtr& scan3)
+void ScanUnifierNode::sync3FilterCallback(const sensor_msgs::msg::LaserScan::SharedPtr& scan1,
+                                          const sensor_msgs::msg::LaserScan::SharedPtr& scan2,
+                                          const sensor_msgs::msg::LaserScan::SharedPtr& scan3)
 {
-  std::vector<sensor_msgs::LaserScan::ConstPtr> current_scans;
+  std::vector<sensor_msgs::msg::LaserScan::SharedPtr> current_scans;
   current_scans.push_back(scan1);
   current_scans.push_back(scan2);
   current_scans.push_back(scan3);
 
-  sensor_msgs::LaserScan unified_scan = sensor_msgs::LaserScan();
+  auto unified_scan = sensor_msgs::msg::LaserScan();
+
   if (!unifyLaserScans(current_scans, unified_scan))
   {
     return;
   }
   publish(unified_scan);
+  return;
 }
 
-void ScanUnifierNode::messageFilterCallback(const sensor_msgs::LaserScan::ConstPtr& scan1,
-                                            const sensor_msgs::LaserScan::ConstPtr& scan2,
-                                            const sensor_msgs::LaserScan::ConstPtr& scan3,
-                                            const sensor_msgs::LaserScan::ConstPtr& scan4)
+void ScanUnifierNode::sync4FilterCallback(const sensor_msgs::msg::LaserScan::SharedPtr& scan1,
+                                          const sensor_msgs::msg::LaserScan::SharedPtr& scan2,
+                                          const sensor_msgs::msg::LaserScan::SharedPtr& scan3,
+                                          const sensor_msgs::msg::LaserScan::SharedPtr& scan4)
 {
-  std::vector<sensor_msgs::LaserScan::ConstPtr> current_scans;
+  std::vector<sensor_msgs::msg::LaserScan::SharedPtr> current_scans;
   current_scans.push_back(scan1);
   current_scans.push_back(scan2);
   current_scans.push_back(scan3);
   current_scans.push_back(scan4);
 
-  sensor_msgs::LaserScan unified_scan = sensor_msgs::LaserScan();
+  RCLCPP_DEBUG(this->get_logger(), "Scans: %ld", current_scans.size());
+  auto unified_scan = sensor_msgs::msg::LaserScan();
+
   if (!unifyLaserScans(current_scans, unified_scan))
   {
+    RCLCPP_DEBUG(this->get_logger(), "returning...");
     return;
   }
   publish(unified_scan);
+  return;
 }
 
-void ScanUnifierNode::publish(sensor_msgs::LaserScan& unified_scan)
-{
-  ROS_DEBUG("Publishing unified scan.");
-  topicPub_LaserUnified_.publish(unified_scan);
-  if(config_.publish_pointcloud)
-  {
-    sensor_msgs::PointCloud2 unified_pointcloud = sensor_msgs::PointCloud2();
-    projector_.transformLaserScanToPointCloud(frame_, unified_scan, unified_pointcloud, listener_);
-    topicPub_PointCloudUnified_.publish(unified_pointcloud);
-  }
-}
 
-*/
-
-/**
- * @function unifyLaserScans
- * @brief unifie the scan information from all laser scans in vec_laser_struct_
- *
- * input: -
- * output:
- * @param: a laser scan message containing unified information from all scanners
-
-bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::LaserScan::ConstPtr>& current_scans,
-                                      sensor_msgs::LaserScan& unified_scan)
-{
-  if (vec_cloud_.size() != config_.number_input_scans)
-  {
-    vec_cloud_.resize(config_.number_input_scans);
-  }
-
-  if(!current_scans.empty())
-  {
-    ROS_DEBUG("start converting");
-    for(int i=0; i < config_.number_input_scans; i++)
-    {
-      vec_cloud_[i].header.stamp = current_scans[i]->header.stamp;
-      ROS_DEBUG_STREAM("Converting scans to point clouds at index: "
-                       << i << ", at time: " << current_scans[i]->header.stamp << " now: " << ros::Time::now());
-      try
-      {
-        if (!listener_.waitForTransform(frame_, current_scans[i]->header.frame_id, current_scans[i]->header.stamp,
-                                        ros::Duration(1.0)))
-        {
-          ROS_WARN_STREAM("Scan unifier skipped scan with " << current_scans[i]->header.stamp
-                                                            << " stamp, because of missing tf transform.");
-          return false;
-        }
-
-        ROS_DEBUG("now project to pointcloud");
-        projector_.transformLaserScanToPointCloud(frame_, *current_scans[i], vec_cloud_[i], listener_);
-      }
-      catch(tf::TransformException &ex){
-        ROS_ERROR("%s",ex.what());
-      }
-    }
-    ROS_DEBUG("Creating message header");
-    unified_scan.header = current_scans.front()->header;
-    unified_scan.header.frame_id = frame_;
-    unified_scan.angle_increment = std::abs(current_scans.front()->angle_increment);
-    unified_scan.angle_min = -M_PI + unified_scan.angle_increment*0.01;
-    unified_scan.angle_max =  M_PI - unified_scan.angle_increment*0.01;
-    unified_scan.time_increment = current_scans.front()->time_increment;
-    unified_scan.scan_time = current_scans.front()->scan_time;
-    unified_scan.range_min = current_scans.front()->range_min;
-    unified_scan.range_max = current_scans.front()->range_max;
-    //default values (ranges: range_max, intensities: 0) are used to better reflect the driver behavior
-    //there "phantom" data has values > range_max
-    //but those values are removed during projection to pointcloud
-    unified_scan.ranges.resize(round((unified_scan.angle_max - unified_scan.angle_min) / unified_scan.angle_increment) + 1, unified_scan.range_max);
-    unified_scan.intensities.resize(round((unified_scan.angle_max - unified_scan.angle_min) / unified_scan.angle_increment) + 1, 0.0);
-
-    // now unify all Scans
-    ROS_DEBUG("unify scans");
-    for(int j = 0; j < config_.number_input_scans; j++)
-    {
-      for (unsigned int i = 0; i < vec_cloud_[j].points.size(); i++)
-      {
-        const float& x = vec_cloud_[j].points[i].x;
-        const float& y = vec_cloud_[j].points[i].y;
-        const float& z = vec_cloud_[j].points[i].z;
-        //ROS_INFO("Point %f %f %f", x, y, z);
-        if ( std::isnan(x) || std::isnan(y) || std::isnan(z) )
-        {
-          ROS_DEBUG("rejected for nan in point(%f, %f, %f)\n", x, y, z);
-          continue;
-        }
-        double angle = atan2(y, x);// + M_PI/2;
-        if (angle < unified_scan.angle_min || angle > unified_scan.angle_max)
-        {
-          ROS_DEBUG("rejected for angle %f not in range (%f, %f)\n", angle, unified_scan.angle_min, unified_scan.angle_max);
-          continue;
-        }
-        int index = std::floor(0.5 + (angle - unified_scan.angle_min) / unified_scan.angle_increment);
-        if(index<0 || index>=unified_scan.ranges.size()) continue;
-
-        double range_sq = y*y+x*x;
-        //printf ("index xyz( %f %f %f) angle %f index %d range %f\n", x, y, z, angle, index, sqrt(range_sq));
-        if ((sqrt(range_sq) <= unified_scan.ranges[index]))
-        {
-          // use the nearest reflection point of all scans for unified scan
-          unified_scan.ranges[index] = sqrt(range_sq);
-          // get respective intensity from point cloud intensity-channel (index 0)
-          unified_scan.intensities[index] = vec_cloud_[j].channels.front().values[i];
-        }
-      }
-    }
-  }
-
-  return true;
-}
- */
 int main(int argc, char** argv)
 {
-
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<ScanUnifierNode>();
+  rclcpp::spin(node);
+  rclcpp::shutdown();
   return 0;
 }
+
+

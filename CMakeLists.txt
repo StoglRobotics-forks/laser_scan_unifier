@@ -2,7 +2,9 @@ cmake_minimum_required(VERSION 3.8)
 project(laser_scan_unifier)
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "(GNU|Clang)")
-  add_compile_options(-Wall -Wextra -Werror=conversion -Werror=unused-but-set-variable -Werror=return-type -Werror=shadow)
+  add_compile_options(-Wall -Wextra 
+  -Werror=conversion -Werror=unused-but-set-variable -Werror=return-type -Werror=shadow 
+  -Wno-float-conversion -Wno-sign-compare)
 endif()
 
 # find dependencies
@@ -11,7 +13,9 @@ set(THIS_PACKAGE_INCLUDE_DEPENDS
   rclcpp
   sensor_msgs
   tf2_ros
+  tf2_sensor_msgs
   tf2_geometry_msgs
+  tf2
 )
 find_package(ament_cmake REQUIRED)
 foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
