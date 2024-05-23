@@ -32,7 +32,6 @@ ScanUnifierNode::ScanUnifierNode()
   //########################## PARAMETERS
   //getParams();
   // GET PARAMS SOMEHOW
-  
   config_.number_input_scans=4;
   config_.input_scan_topics.push_back("laser_scan_right");
   config_.input_scan_topics.push_back("laser_scan_front");
@@ -44,8 +43,9 @@ ScanUnifierNode::ScanUnifierNode()
 
   //########################## PARAMETERS
 
-
-
+  // Initialize TF buffer and listener
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+  tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
 
   // Publisher
   topicPub_LaserUnified_ = this->create_publisher<sensor_msgs::msg::LaserScan>("scan_unified", 1);
@@ -142,20 +142,22 @@ bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::msg::LaserS
   {
     RCLCPP_DEBUG(logger_, " - project to PointCloud2");
     projector_.projectLaser(*current_scans[i], vec_cloud_[i]);
-    /* For testing purposes, turn off point cloud publishing 
     // Transform cloud if necessary
+
     if (!frame_.empty() &&vec_cloud_[i].header.frame_id != frame_) {
       try 
       {
-        vec_cloud_[i] = tf_buffer_->transform(vec_cloud_[i], frame_, tf2::durationFromSec(0.1)); //make into parameter
+        auto cloud = std::make_shared<sensor_msgs::msg::PointCloud2>();
+        tf_buffer_->transform(vec_cloud_[i], *cloud, frame_, tf2::durationFromSec(0.1)); //make into parameter
+        vec_cloud_[i] = *cloud;
       } 
       catch (tf2::TransformException & ex) 
       {
-        RCLCPP_ERROR_STREAM(logger_, " - PointCloud2 transform failure: " << ex.what());
+        RCLCPP_DEBUG(logger_, " - PointCloud2 transform failure: %s", ex.what());
         return false;
       }
     }
-    */
+    
   }
 
   RCLCPP_DEBUG(logger_, "... Complete! Unifying scans...");
@@ -276,16 +278,19 @@ void ScanUnifierNode::sync4FilterCallback(const sensor_msgs::msg::LaserScan::Sha
 {
   std::vector<sensor_msgs::msg::LaserScan::SharedPtr> current_scans;
   current_scans.push_back(scan1);
+  RCLCPP_DEBUG(this->get_logger(), "Scan 1 frame_id: %s", scan1->header.frame_id.c_str());
   current_scans.push_back(scan2);
+  RCLCPP_DEBUG(this->get_logger(), "Scan 2 frame_id: %s", scan2->header.frame_id.c_str());
   current_scans.push_back(scan3);
+  RCLCPP_DEBUG(this->get_logger(), "Scan 3 frame_id: %s", scan3->header.frame_id.c_str());
   current_scans.push_back(scan4);
+  RCLCPP_DEBUG(this->get_logger(), "Scan 4 frame_id: %s", scan4->header.frame_id.c_str());
 
-  RCLCPP_DEBUG(this->get_logger(), "Scans: %ld", current_scans.size());
   auto unified_scan = sensor_msgs::msg::LaserScan();
 
   if (!unifyLaserScans(current_scans, unified_scan))
   {
-    RCLCPP_DEBUG(this->get_logger(), "returning...");
+    RCLCPP_DEBUG(this->get_logger(), "returning..." );
     return;
   }
   publish(unified_scan);

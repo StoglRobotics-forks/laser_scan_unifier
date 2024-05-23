@@ -103,7 +103,7 @@ class ScanUnifierNode : public rclcpp::Node
 
     // tf listener
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 
     // laser geometry projector
     laser_geometry::LaserProjection projector_;
