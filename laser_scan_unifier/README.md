@@ -1,4 +1,4 @@
-cob\_scan\_unifier
+laser\_scan\_unifier
 ====================
 
 General description

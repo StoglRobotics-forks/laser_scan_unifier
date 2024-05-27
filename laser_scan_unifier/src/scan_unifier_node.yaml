@@ -1,0 +1,41 @@
+# Copyright (c) 20224 Stogl Robotics Consulting UG (haftungsbeschränkt)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+#
+# Source of this file are templates in
+# [RosTeamWorkspace](https://github.com/StoglRobotics/ros_team_workspace) repository.
+#
+
+scan_unifier_node:
+  number_of_scans: {
+    type: int,
+    description: "Number of LaserScans to combine - maximum of four",
+    read_only: true,
+  }
+  input_topic_names: {
+    type: string_array,
+    description: "LaserScan topic names",
+    read_only: true,
+  }
+  output_frame: {
+    type: string,
+    description: "Frame in which the output LaserScan is published",
+    read_only: true,
+  }
+  inter_message_lower_bound: {
+    type: double,
+    default_value: 0.167,
+    description: "Minimum time between two consecutive messages on any of the LaserScan topics. Usually set to 1/2 of the scan topic period.",
+    read_only: true,
+  }
