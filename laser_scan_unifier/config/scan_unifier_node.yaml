@@ -7,5 +7,4 @@ scan_unifier_node:
       - laser_scan_left
       - laser_scan_back
     output_frame: base_link
-    publish_pointcloud: true
     inter_message_lower_bound: 0.167

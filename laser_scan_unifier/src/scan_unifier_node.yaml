@@ -33,12 +33,6 @@ scan_unifier_node:
     description: "Frame in which the output LaserScan is published",
     read_only: true,
   }
-  publish_pointcloud: {
-    type: bool,
-    default_value: true,
-    description: "If true, publishes PointCloud2 msg from which the final, unified scan is converted into.",
-    read_only: true,
-  }
   inter_message_lower_bound: {
     type: double,
     default_value: 0.167,
