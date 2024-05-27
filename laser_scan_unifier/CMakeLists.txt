@@ -10,6 +10,7 @@ endif()
 # find dependencies
 set(THIS_PACKAGE_INCLUDE_DEPENDS
   laser_geometry
+  generate_parameter_library
   rclcpp
   sensor_msgs
   tf2_ros
@@ -22,38 +23,43 @@ foreach(Dependency IN ITEMS ${THIS_PACKAGE_INCLUDE_DEPENDS})
   find_package(${Dependency} REQUIRED)
 endforeach()
 
-# Add library for the header file
-add_library(
-  laser_scan_unifier 
-  SHARED
-  src/scan_unifier_node.cpp
+# Add scan_unifier_node library related compile commands
+generate_parameter_library(scan_unifier_node_parameters
+  src/scan_unifier_node.yaml
 )
-# Add executable
 add_executable(scan_unifier_node src/scan_unifier_node.cpp)
+target_include_directories(scan_unifier_node PRIVATE
+  "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
+target_link_libraries(scan_unifier_node scan_unifier_node_parameters)
+ament_target_dependencies(scan_unifier_node ${THIS_PACKAGE_INCLUDE_DEPENDS})
 
-target_include_directories(
-  laser_scan_unifier
-  PUBLIC
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+install(
+  TARGETS
+  scan_unifier_node
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
-ament_target_dependencies(
-  laser_scan_unifier PUBLIC
-  ${THIS_PACKAGE_INCLUDE_DEPENDS}
-)
-# Link the library to the executable
-target_link_libraries(scan_unifier_node laser_scan_unifier)
-
 
 install(
   DIRECTORY include/
-  DESTINATION include
+  DESTINATION include/${PROJECT_NAME}
 )
 
-# Install
-install(TARGETS
+install(
+  DIRECTORY config
+  DESTINATION share/${PROJECT_NAME}
+)
+
+ament_export_include_directories(
+  include
+)
+
+ament_export_dependencies(
+  ${THIS_PACKAGE_INCLUDE_DEPENDS}
+)
+
+ament_export_libraries(
   scan_unifier_node
-  DESTINATION lib/${PROJECT_NAME}
 )
 
 ament_package()

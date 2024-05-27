@@ -25,6 +25,7 @@
 #include <thread>
 //#include <XmlRpc.h>
 #include <math.h>
+#include "scan_unifier_node_parameters.hpp"
 
 // ROS includes
 #include "rclcpp/rclcpp.hpp"
@@ -61,6 +62,10 @@ class ScanUnifierNode : public rclcpp::Node
      *  @var config_struct::input_scan_topics
      *  Member 'input_scan_topics' contains the names of the input scan topics
      */
+
+    std::shared_ptr<scan_unifier_node::ParamListener> param_listener_;
+    scan_unifier_node::Params params_;
+
     struct config_struct{
       size_t number_input_scans;
       std::vector<std::string> input_scan_topics;

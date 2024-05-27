@@ -23,25 +23,13 @@ ScanUnifierNode::ScanUnifierNode()
   : Node("scan_unifier_node")
 {
   auto logger_ = this->get_logger();
-  RCLCPP_DEBUG(logger_, "Init scan_unifier");
+  RCLCPP_DEBUG(logger_, "Initializing scan_unifier_node...");
   
   synchronizer2_ = NULL;
   synchronizer3_ = NULL;
   synchronizer4_ = NULL;
 
-  //########################## PARAMETERS
-  //getParams();
-  // GET PARAMS SOMEHOW
-  config_.number_input_scans=4;
-  config_.input_scan_topics.push_back("laser_scan_right");
-  config_.input_scan_topics.push_back("laser_scan_front");
-  config_.input_scan_topics.push_back("laser_scan_left");
-  config_.input_scan_topics.push_back("laser_scan_back");
-  frame_ = "base_link";
-  // Minimum possible time between messages on the same topic
-  auto inter_message_lower_bound = rclcpp::Duration::from_seconds(0.167);
-
-  //########################## PARAMETERS
+  getParams();
 
   // Initialize TF buffer and listener
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -72,8 +60,8 @@ ScanUnifierNode::ScanUnifierNode()
       synchronizer2_ = std::make_shared<message_filters::Synchronizer<Sync2Policy>>(Sync2Policy(2), 
         *message_filter_subscribers_[0], 
         *message_filter_subscribers_[1]);
-      synchronizer2_->setInterMessageLowerBound(0, inter_message_lower_bound);
-      synchronizer2_->setInterMessageLowerBound(1, inter_message_lower_bound);
+      synchronizer2_->setInterMessageLowerBound(0, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
+      synchronizer2_->setInterMessageLowerBound(1, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
       synchronizer2_->registerCallback(&ScanUnifierNode::sync2FilterCallback, this);
       break;
     }
@@ -83,9 +71,9 @@ ScanUnifierNode::ScanUnifierNode()
         *message_filter_subscribers_[0], 
         *message_filter_subscribers_[1], 
         *message_filter_subscribers_[2]);
-      synchronizer3_->setInterMessageLowerBound(0, inter_message_lower_bound);
-      synchronizer3_->setInterMessageLowerBound(1, inter_message_lower_bound);
-      synchronizer3_->setInterMessageLowerBound(2, inter_message_lower_bound);
+      synchronizer3_->setInterMessageLowerBound(0, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
+      synchronizer3_->setInterMessageLowerBound(1, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
+      synchronizer3_->setInterMessageLowerBound(2, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
       synchronizer3_->registerCallback(&ScanUnifierNode::sync3FilterCallback, this);
       break;
     }
@@ -96,10 +84,10 @@ ScanUnifierNode::ScanUnifierNode()
         *message_filter_subscribers_[1], 
         *message_filter_subscribers_[2], 
         *message_filter_subscribers_[3]);
-      synchronizer4_->setInterMessageLowerBound(0, inter_message_lower_bound);
-      synchronizer4_->setInterMessageLowerBound(1, inter_message_lower_bound);
-      synchronizer4_->setInterMessageLowerBound(2, inter_message_lower_bound);
-      synchronizer4_->setInterMessageLowerBound(3, inter_message_lower_bound);
+      synchronizer4_->setInterMessageLowerBound(0, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
+      synchronizer4_->setInterMessageLowerBound(1, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
+      synchronizer4_->setInterMessageLowerBound(2, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
+      synchronizer4_->setInterMessageLowerBound(3, rclcpp::Duration::from_seconds(params_.inter_message_lower_bound));
       synchronizer4_->registerCallback(&ScanUnifierNode::sync4FilterCallback, this);
       break;
     }
@@ -295,6 +283,24 @@ void ScanUnifierNode::sync4FilterCallback(const sensor_msgs::msg::LaserScan::Sha
   }
   publish(unified_scan);
   return;
+}
+
+void ScanUnifierNode::getParams()
+{
+  auto logger_ = this->get_logger();
+  param_listener_ = std::make_shared<scan_unifier_node::ParamListener>(this->get_node_parameters_interface());
+  params_ = param_listener_->get_params();
+
+  RCLCPP_DEBUG(logger_, "Parameters read.");
+  config_.number_input_scans=static_cast<size_t>(params_.number_of_scans);
+  config_.input_scan_topics = params_.input_topic_names;
+  RCLCPP_DEBUG(logger_, "Number of input scans: %ld", config_.number_input_scans);
+  RCLCPP_DEBUG(logger_, "Topic names:");
+  for (auto &&topic : config_.input_scan_topics)
+  {
+    RCLCPP_DEBUG(logger_, "  /%s", topic.c_str());
+  }
+  frame_ = params_.output_frame;
 }
 
 

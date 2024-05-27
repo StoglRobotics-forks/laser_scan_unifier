@@ -10,11 +10,12 @@
   <maintainer email="benjamin.maidel@mojin-robotics.de">Benjamin Maidel</maintainer>
   <author email="frm@ipa.fraunhofer.de">Florian Mirus</author>
   <!-- ros2 port author -->
-  <author email="nibanovic@gmail.com">Nikola Banović</author>
+  <author email="nikola.banovic@posidonia-technology.hr">Nikola Banović</author>
 
   <license>Apache 2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>generate_parameter_library</build_depend>
 
   <depend>laser_geometry</depend>
   <depend>rclcpp</depend>

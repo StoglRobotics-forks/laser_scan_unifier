@@ -1,0 +1,11 @@
+scan_unifier_node:
+  ros__parameters:
+    number_of_scans: 4
+    input_topic_names:
+      - laser_scan_right
+      - laser_scan_front
+      - laser_scan_left
+      - laser_scan_back
+    output_frame: base_link
+    publish_pointcloud: true
+    inter_message_lower_bound: 0.167
