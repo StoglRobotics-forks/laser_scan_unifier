@@ -1,0 +1,33 @@
+laser_scan_unifier:
+  input_scan_topics: {
+    type: string_array,
+    default_value: ["laser_scan_front", "laser_scan_rear"],
+    description: "Topic names on which laser scan unifer should listen to individual laser scan data. Currently between 2 and 4 laser scanns are supported.",
+    read_only: true,
+    validation: {
+      size_gt<>: [1],
+      size_lt<>: [5],
+      unique<>: null
+    }
+  }
+  frame: {
+    type: string,
+    default_value: "base_link",
+    description: "Name of the frame in which unified laser scan should be published.",
+    read_only: true,
+    validation: {
+      not_empty<>: null,
+    }
+  }
+  min_time_between_messages_on_topic: {
+    type: double,
+    default_value: 0.167,
+    description: "Minimum possible time between messages on the same topic. It depends on the frequency of the published laser scan.",
+    read_only: true,
+  }
+  publish_pointcloud: {
+    type: bool,
+    default_value: false,
+    description: "Publish unified laser scan as point cloud.",
+    read_only: true,
+  }

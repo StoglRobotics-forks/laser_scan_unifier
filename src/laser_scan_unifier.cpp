@@ -15,7 +15,7 @@
  */
 
 
-#include "laser_scan_unifier/scan_unifier_node.hpp"
+#include "laser_scan_unifier/laser_scan_unifier.hpp"
 
 
 // Constructor
@@ -29,19 +29,14 @@ ScanUnifierNode::ScanUnifierNode()
   synchronizer3_ = NULL;
   synchronizer4_ = NULL;
 
-  //########################## PARAMETERS
-  //getParams();
-  // GET PARAMS SOMEHOW
-  config_.number_input_scans=4;
-  config_.input_scan_topics.push_back("laser_scan_right");
-  config_.input_scan_topics.push_back("laser_scan_front");
-  config_.input_scan_topics.push_back("laser_scan_left");
-  config_.input_scan_topics.push_back("laser_scan_back");
-  frame_ = "base_link";
-  // Minimum possible time between messages on the same topic
-  auto inter_message_lower_bound = rclcpp::Duration::from_seconds(0.167);
+  // BEGIN PARAMETERS
+  // Create the parameter listener and get the parameters
+  param_listener_ = std::make_shared<laser_scan_unifier::ParamListener>(this->get_node_parameters_interface());
+  params_ = param_listener_->get_params();
 
-  //########################## PARAMETERS
+  // Minimum possible time between messages on the same topic
+  auto inter_message_lower_bound = rclcpp::Duration::from_seconds(params_.min_time_between_messages_on_topic);
+  // END PARAMETERS
 
   // Initialize TF buffer and listener
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
@@ -49,7 +44,7 @@ ScanUnifierNode::ScanUnifierNode()
 
   // Publisher
   topicPub_LaserUnified_ = this->create_publisher<sensor_msgs::msg::LaserScan>("scan_unified", 1);
-  if(config_.publish_pointcloud)
+  if(params_.publish_pointcloud)
   {
     topicPub_PointCloudUnified_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("pointcloud_unified", 1);
   }
@@ -57,15 +52,16 @@ ScanUnifierNode::ScanUnifierNode()
   // Subscribe to Laserscan topics
   auto subscriber_options = rclcpp::QoS(rclcpp::QoSInitialization::from_rmw(rmw_qos_profile_default));
   subscriber_options.reliability(rmw_qos_reliability_policy_t::RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT);
-  for(size_t i = 0; i < config_.number_input_scans; i++){
+  for (const auto & topic : params_.input_scan_topics)
+  {
     // Store the subscriber shared_ptr in a vector if needed for later access
-    auto sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(this, config_.input_scan_topics[i], subscriber_options.get_rmw_qos_profile());
+    auto sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::LaserScan>>(this, topic, subscriber_options.get_rmw_qos_profile());
     message_filter_subscribers_.push_back(sub);
   }
 
 
   // Initialize message_filters::Synchronizer with the right constructor for the choosen number of inputs.
-  switch (config_.number_input_scans)
+  switch (params_.input_scan_topics.size())
   {
     case 2:
     { 
@@ -104,7 +100,7 @@ ScanUnifierNode::ScanUnifierNode()
       break;
     }
     default:
-      RCLCPP_ERROR_STREAM(logger_, config_.number_input_scans << " topics have been set as input, but scan_unifier supports between 2 and 4 topics.");
+      RCLCPP_ERROR_STREAM(logger_, params_.input_scan_topics.size() << " topics have been set as input, but scan_unifier supports between 2 and 4 topics.");
       return;
   }
 
@@ -129,26 +125,26 @@ bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::msg::LaserS
     return false;
   }
 
-  if (vec_cloud_.size() != config_.number_input_scans)
+  if (vec_cloud_.size() != params_.input_scan_topics.size())
   {
-    vec_cloud_.resize(config_.number_input_scans);
+    vec_cloud_.resize(params_.input_scan_topics.size());
   }
   auto logger_ = this->get_logger();
 
   
   RCLCPP_DEBUG(logger_, "Starting conversion...");
 
-  for(size_t i=0; i < config_.number_input_scans; i++)
+  for(size_t i=0; i < params_.input_scan_topics.size(); i++)
   {
     RCLCPP_DEBUG(logger_, " - project to PointCloud2");
     projector_.projectLaser(*current_scans[i], vec_cloud_[i]);
     // Transform cloud if necessary
 
-    if (!frame_.empty() &&vec_cloud_[i].header.frame_id != frame_) {
+    if (!params_.frame.empty() &&vec_cloud_[i].header.frame_id != params_.frame) {
       try 
       {
         auto cloud = std::make_shared<sensor_msgs::msg::PointCloud2>();
-        tf_buffer_->transform(vec_cloud_[i], *cloud, frame_, tf2::durationFromSec(0.1)); //make into parameter
+        tf_buffer_->transform(vec_cloud_[i], *cloud, params_.frame, tf2::durationFromSec(0.1)); //make into parameter
         vec_cloud_[i] = *cloud;
       } 
       catch (tf2::TransformException & ex) 
@@ -163,7 +159,7 @@ bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::msg::LaserS
   RCLCPP_DEBUG(logger_, "... Complete! Unifying scans...");
   RCLCPP_DEBUG(logger_, " - Creating message header");
   unified_scan.header = current_scans.front()->header;
-  unified_scan.header.frame_id = frame_;
+  unified_scan.header.frame_id = params_.frame;
   unified_scan.angle_increment = std::abs(current_scans.front()->angle_increment);
   unified_scan.angle_min = static_cast<float>(-M_PI + unified_scan.angle_increment*0.01);
   unified_scan.angle_max = static_cast<float>(M_PI - unified_scan.angle_increment*0.01);
@@ -178,7 +174,7 @@ bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::msg::LaserS
   unified_scan.intensities.resize(round((unified_scan.angle_max - unified_scan.angle_min) / unified_scan.angle_increment+ 1.0), 0.0);
 
   // now unify all Scans
-  for(size_t j = 0; j < config_.number_input_scans; j++)
+  for(size_t j = 0; j < params_.input_scan_topics.size(); j++)
   { 
     // Iterating over PointCloud2 point xyz values
     sensor_msgs::PointCloud2Iterator<float> iterX(vec_cloud_[j], "x");
@@ -225,10 +221,10 @@ void ScanUnifierNode::publish(sensor_msgs::msg::LaserScan& unified_scan)
   RCLCPP_DEBUG(this->get_logger(), "Publishing unified scan.");
   topicPub_LaserUnified_->publish(unified_scan);
   /* extract pointcloud transform into a separate function
-  if(config_.publish_pointcloud)
+  if(params_.publish_pointcloud)
   {
     auto unified_pointcloud = sensor_msgs::msg::PointCloud2();
-    projector_.transformLaserScanToPointCloud(frame_, unified_scan, unified_pointcloud, tf_buffer_core_);
+    projector_.transformLaserScanToPointCloud(params_.frame, unified_scan, unified_pointcloud, tf_buffer_core_);
     topicPub_PointCloudUnified_->publish(unified_pointcloud);
   }
   */
