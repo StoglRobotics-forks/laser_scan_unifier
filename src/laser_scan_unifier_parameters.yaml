@@ -19,6 +19,15 @@ laser_scan_unifier:
       not_empty<>: null,
     }
   }
+  time_sync_policy: {
+    type: string,
+    default_value: "approximate",
+    description: "Time synchronization policy between the input topics. Currently supported 'approximate' and 'latest'. For more info see documenation of 'message_filters' package.",
+    read_only: true,
+    validation: {
+      one_of<>: [["approximate", "latest"]],
+    }
+  }
   min_time_between_messages_on_topic: {
     type: double,
     default_value: 0.167,

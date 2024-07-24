@@ -25,9 +25,9 @@ ScanUnifierNode::ScanUnifierNode()
   auto logger_ = this->get_logger();
   RCLCPP_DEBUG(logger_, "Init scan_unifier");
   
-  synchronizer2_ = NULL;
-  synchronizer3_ = NULL;
-  synchronizer4_ = NULL;
+  approximate_time_synchronizer2_ = NULL;
+  approximate_time_synchronizer3_ = NULL;
+  approximate_time_synchronizer4_ = NULL;
 
   // BEGIN PARAMETERS
   // Create the parameter listener and get the parameters
@@ -64,39 +64,75 @@ ScanUnifierNode::ScanUnifierNode()
   switch (params_.input_scan_topics.size())
   {
     case 2:
-    { 
-      synchronizer2_ = std::make_shared<message_filters::Synchronizer<Sync2Policy>>(Sync2Policy(2), 
-        *message_filter_subscribers_[0], 
-        *message_filter_subscribers_[1]);
-      synchronizer2_->setInterMessageLowerBound(0, inter_message_lower_bound);
-      synchronizer2_->setInterMessageLowerBound(1, inter_message_lower_bound);
-      synchronizer2_->registerCallback(&ScanUnifierNode::sync2FilterCallback, this);
+    {
+      if (params_.time_sync_policy == "latest")
+      {
+        latest_time_synchronizer2_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync2Policy>>(LatestTimeSync2Policy(),
+          *message_filter_subscribers_[0],
+          *message_filter_subscribers_[1]);
+        latest_time_synchronizer2_->registerCallback(&ScanUnifierNode::sync2FilterCallback, this);
+      }
+      else
+      {
+        RCLCPP_WARN_EXPRESSION(this->get_logger(), params_.time_sync_policy != "approximate", "The time sync policy '%s' is unknown. Fallback to 'approximate'!", params_.time_sync_policy.c_str());
+        approximate_time_synchronizer2_ = std::make_shared<message_filters::Synchronizer<ApproximateTimeSync2Policy>>(ApproximateTimeSync2Policy(2),
+          *message_filter_subscribers_[0],
+          *message_filter_subscribers_[1]);
+        approximate_time_synchronizer2_->setInterMessageLowerBound(0, inter_message_lower_bound);
+        approximate_time_synchronizer2_->setInterMessageLowerBound(1, inter_message_lower_bound);
+        approximate_time_synchronizer2_->registerCallback(&ScanUnifierNode::sync2FilterCallback, this);
+      }
       break;
     }
     case 3:
-    { 
-      synchronizer3_ = std::make_shared<message_filters::Synchronizer<Sync3Policy>>(Sync3Policy(3), 
-        *message_filter_subscribers_[0], 
-        *message_filter_subscribers_[1], 
-        *message_filter_subscribers_[2]);
-      synchronizer3_->setInterMessageLowerBound(0, inter_message_lower_bound);
-      synchronizer3_->setInterMessageLowerBound(1, inter_message_lower_bound);
-      synchronizer3_->setInterMessageLowerBound(2, inter_message_lower_bound);
-      synchronizer3_->registerCallback(&ScanUnifierNode::sync3FilterCallback, this);
+    {
+      if (params_.time_sync_policy == "latest")
+      {
+        latest_time_synchronizer3_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync3Policy>>(LatestTimeSync3Policy(),
+                                                                                                            *message_filter_subscribers_[0],
+                                                                                                            *message_filter_subscribers_[1],
+                                                                                                            *message_filter_subscribers_[2]);
+        latest_time_synchronizer3_->registerCallback(&ScanUnifierNode::sync3FilterCallback, this);
+      }
+      else
+      {
+        RCLCPP_WARN_EXPRESSION(this->get_logger(), params_.time_sync_policy != "approximate", "The time sync policy '%s' is unknown. Fallback to 'approximate'!", params_.time_sync_policy.c_str());
+        approximate_time_synchronizer3_ = std::make_shared<message_filters::Synchronizer<ApproximateTimeSync3Policy>>(ApproximateTimeSync3Policy(3),
+          *message_filter_subscribers_[0],
+          *message_filter_subscribers_[1],
+          *message_filter_subscribers_[2]);
+        approximate_time_synchronizer3_->setInterMessageLowerBound(0, inter_message_lower_bound);
+        approximate_time_synchronizer3_->setInterMessageLowerBound(1, inter_message_lower_bound);
+        approximate_time_synchronizer3_->setInterMessageLowerBound(2, inter_message_lower_bound);
+        approximate_time_synchronizer3_->registerCallback(&ScanUnifierNode::sync3FilterCallback, this);
+      }
       break;
     }
     case 4:
-    { 
-      synchronizer4_ = std::make_shared<message_filters::Synchronizer<Sync4Policy>>(Sync4Policy(10), 
-        *message_filter_subscribers_[0], 
-        *message_filter_subscribers_[1], 
-        *message_filter_subscribers_[2], 
-        *message_filter_subscribers_[3]);
-      synchronizer4_->setInterMessageLowerBound(0, inter_message_lower_bound);
-      synchronizer4_->setInterMessageLowerBound(1, inter_message_lower_bound);
-      synchronizer4_->setInterMessageLowerBound(2, inter_message_lower_bound);
-      synchronizer4_->setInterMessageLowerBound(3, inter_message_lower_bound);
-      synchronizer4_->registerCallback(&ScanUnifierNode::sync4FilterCallback, this);
+    {
+      if (params_.time_sync_policy == "latest")
+      {
+        latest_time_synchronizer4_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync4Policy>>(LatestTimeSync4Policy(),
+                                                                                                            *message_filter_subscribers_[0],
+                                                                                                            *message_filter_subscribers_[1],
+                                                                                                            *message_filter_subscribers_[2],
+                                                                                                            *message_filter_subscribers_[3]);
+        latest_time_synchronizer4_->registerCallback(&ScanUnifierNode::sync4FilterCallback, this);
+      }
+      else
+      {
+        RCLCPP_WARN_EXPRESSION(this->get_logger(), params_.time_sync_policy != "approximate", "The time sync policy '%s' is unknown. Fallback to 'approximate'!", params_.time_sync_policy.c_str());
+        approximate_time_synchronizer4_ = std::make_shared<message_filters::Synchronizer<ApproximateTimeSync4Policy>>(ApproximateTimeSync4Policy(10),
+          *message_filter_subscribers_[0],
+          *message_filter_subscribers_[1],
+          *message_filter_subscribers_[2],
+          *message_filter_subscribers_[3]);
+        approximate_time_synchronizer4_->setInterMessageLowerBound(0, inter_message_lower_bound);
+        approximate_time_synchronizer4_->setInterMessageLowerBound(1, inter_message_lower_bound);
+        approximate_time_synchronizer4_->setInterMessageLowerBound(2, inter_message_lower_bound);
+        approximate_time_synchronizer4_->setInterMessageLowerBound(3, inter_message_lower_bound);
+        approximate_time_synchronizer4_->registerCallback(&ScanUnifierNode::sync4FilterCallback, this);
+      }
       break;
     }
     default:
