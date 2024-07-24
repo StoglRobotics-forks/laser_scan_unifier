@@ -24,7 +24,7 @@ ScanUnifierNode::ScanUnifierNode()
 {
   auto logger_ = this->get_logger();
   RCLCPP_DEBUG(logger_, "Init scan_unifier");
-  
+
   approximate_time_synchronizer2_ = NULL;
   approximate_time_synchronizer3_ = NULL;
   approximate_time_synchronizer4_ = NULL;
@@ -189,13 +189,28 @@ bool ScanUnifierNode::unifyLaserScans(const std::vector<sensor_msgs::msg::LaserS
         return false;
       }
     }
-    
   }
 
   RCLCPP_DEBUG(logger_, "... Complete! Unifying scans...");
   RCLCPP_DEBUG(logger_, " - Creating message header");
   unified_scan.header = current_scans.front()->header;
   unified_scan.header.frame_id = params_.frame;
+
+  if (params_.time_sync_policy == "latest")
+  {
+    // find the newest timestamp in header
+    rclcpp::Time output_message_time = rclcpp::Time(current_scans.front()->header.stamp);
+    for(size_t i = 1; i < params_.input_scan_topics.size(); i++)
+    {
+      const rclcpp::Time message_time = rclcpp::Time(current_scans.at(i)->header.stamp);
+      if (output_message_time < message_time)
+      {
+        output_message_time = message_time;
+      }
+    }
+    unified_scan.header.stamp = output_message_time;
+  }
+
   unified_scan.angle_increment = std::abs(current_scans.front()->angle_increment);
   unified_scan.angle_min = static_cast<float>(-M_PI + unified_scan.angle_increment*0.01);
   unified_scan.angle_max = static_cast<float>(M_PI - unified_scan.angle_increment*0.01);
