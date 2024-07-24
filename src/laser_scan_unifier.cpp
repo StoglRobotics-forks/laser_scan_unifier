@@ -67,7 +67,7 @@ ScanUnifierNode::ScanUnifierNode()
     {
       if (params_.time_sync_policy == "latest")
       {
-        latest_time_synchronizer2_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync2Policy>>(LatestTimeSync2Policy(),
+        latest_time_synchronizer2_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync2Policy>>(LatestTimeSync2Policy(this->get_node_clock_interface()->get_clock()),
           *message_filter_subscribers_[0],
           *message_filter_subscribers_[1]);
         latest_time_synchronizer2_->registerCallback(&ScanUnifierNode::sync2FilterCallback, this);
@@ -88,7 +88,7 @@ ScanUnifierNode::ScanUnifierNode()
     {
       if (params_.time_sync_policy == "latest")
       {
-        latest_time_synchronizer3_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync3Policy>>(LatestTimeSync3Policy(),
+        latest_time_synchronizer3_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync3Policy>>(LatestTimeSync3Policy(this->get_node_clock_interface()->get_clock()),
                                                                                                             *message_filter_subscribers_[0],
                                                                                                             *message_filter_subscribers_[1],
                                                                                                             *message_filter_subscribers_[2]);
@@ -112,7 +112,7 @@ ScanUnifierNode::ScanUnifierNode()
     {
       if (params_.time_sync_policy == "latest")
       {
-        latest_time_synchronizer4_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync4Policy>>(LatestTimeSync4Policy(),
+        latest_time_synchronizer4_ = std::make_shared<message_filters::Synchronizer<LatestTimeSync4Policy>>(LatestTimeSync4Policy(this->get_node_clock_interface()->get_clock()),
                                                                                                             *message_filter_subscribers_[0],
                                                                                                             *message_filter_subscribers_[1],
                                                                                                             *message_filter_subscribers_[2],
